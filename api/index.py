@@ -18,4 +18,22 @@ if os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME") or os.
         except Exception as e:
             print(f"[Vercel Init] Failed copying database: {e}")
 
-from app.main import app
+try:
+    from app.main import app
+except Exception as e:
+    import traceback
+    init_err = traceback.format_exc()
+    from fastapi import FastAPI
+    from fastapi.responses import JSONResponse
+    app = FastAPI()
+
+    @app.api_route("/{path_name:path}", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"])
+    async def vercel_init_error(path_name: str):
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "Backend initialization failed on Vercel",
+                "detail": str(e),
+                "traceback": init_err.splitlines()
+            }
+        )
