@@ -39,7 +39,10 @@ if os.environ.get("VERCEL"):
             print(f"[Vercel Init] Failed copying database: {e}")
 
 # ── Create all tables (EventSphere full schema) ──────────────────────────────
-Base.metadata.create_all(bind=engine)
+try:
+    Base.metadata.create_all(bind=engine)
+except Exception as e:
+    print(f"[Init Warning] create_all: {e}")
 
 # ── Seed default admin ───────────────────────────────────────────────────────
 from app.database import SessionLocal
@@ -47,19 +50,22 @@ from app.models.user import User
 from app.services.auth_service import create_user
 
 def _seed_admin() -> None:
-    db = SessionLocal()
     try:
-        if not db.query(User).filter(User.email == settings.FIRST_ADMIN_EMAIL).first():
-            create_user(
-                db,
-                email=settings.FIRST_ADMIN_EMAIL,
-                full_name="Super Admin",
-                password=settings.FIRST_ADMIN_PASSWORD,
-                is_superadmin=True,
-            )
-            print(f"[seed] Created admin user: {settings.FIRST_ADMIN_EMAIL}")
-    finally:
-        db.close()
+        db = SessionLocal()
+        try:
+            if not db.query(User).filter(User.email == settings.FIRST_ADMIN_EMAIL).first():
+                create_user(
+                    db,
+                    email=settings.FIRST_ADMIN_EMAIL,
+                    full_name="Super Admin",
+                    password=settings.FIRST_ADMIN_PASSWORD,
+                    is_superadmin=True,
+                )
+                print(f"[seed] Created admin user: {settings.FIRST_ADMIN_EMAIL}")
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"[Init Warning] _seed_admin: {e}")
 
 _seed_admin()
 

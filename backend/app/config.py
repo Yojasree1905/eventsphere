@@ -12,9 +12,17 @@ def _resolve_database_url() -> str:
         if env_url.startswith("postgres://"):
             return env_url.replace("postgres://", "postgresql://", 1)
         return env_url
-    if os.environ.get("VERCEL"):
+    if os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME") or os.environ.get("LAMBDA_TASK_ROOT"):
         return "sqlite:////tmp/occasio.db"
-    return "sqlite:///./occasio.db"
+    try:
+        test_file = "./.test_write"
+        with open(test_file, "w") as f:
+            f.write("1")
+        if os.path.exists(test_file):
+            os.remove(test_file)
+        return "sqlite:///./occasio.db"
+    except Exception:
+        return "sqlite:////tmp/occasio.db"
 
 
 class Settings(BaseSettings):
