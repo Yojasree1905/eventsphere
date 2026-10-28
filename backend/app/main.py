@@ -25,6 +25,19 @@ from app.routers import (
     judges,
 )
 
+# If running on Vercel, copy the pre-seeded SQLite database to writable /tmp
+if os.environ.get("VERCEL"):
+    import shutil
+    BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    db_source = os.path.join(BACKEND_DIR, "occasio.db")
+    tmp_db = "/tmp/occasio.db"
+    if not os.path.exists(tmp_db) and os.path.exists(db_source):
+        try:
+            shutil.copyfile(db_source, tmp_db)
+            print("[Vercel Init] Seed database copied to /tmp/occasio.db")
+        except Exception as e:
+            print(f"[Vercel Init] Failed copying database: {e}")
+
 # ── Create all tables (EventSphere full schema) ──────────────────────────────
 Base.metadata.create_all(bind=engine)
 
@@ -59,8 +72,23 @@ app = FastAPI(
 
 @app.on_event("startup")
 def startup_firestore():
-    from app.services.firestore_service import init_firestore
-    init_firestore()
+    try:
+        from app.services.firestore_service import init_firestore
+        init_firestore()
+    except Exception as e:
+        print(f"[Firestore Startup Warning] {e}")
+
+@app.middleware("http")
+async def normalize_api_path(request: Request, call_next):
+    # If the incoming path does not start with /api and does not start with /assets
+    # (e.g. if Vercel stripped the /api prefix during rewrite), normalize it to /api/*
+    path = request.scope.get("path", "")
+    if path and not path.startswith("/api") and not path.startswith("/assets") and not path.startswith("/docs") and not path.startswith("/openapi.json"):
+        # Check if stripping /api made it an API route like /auth/login, /events, etc.
+        first_segment = path.strip("/").split("/")[0] if path.strip("/") else ""
+        if first_segment in ["auth", "events", "schedules", "participants", "registrations", "monitoring", "feedbacks", "scores", "certificates", "teams", "attendance", "recommendations", "universities", "judges", "health"]:
+            request.scope["path"] = "/api" + path
+    return await call_next(request)
 
 app.add_middleware(
     CORSMiddleware,

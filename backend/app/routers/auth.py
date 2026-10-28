@@ -64,6 +64,24 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
             db.add(p)
             db.commit()
 
+    # Real-time Cloud Firestore synchronization
+    try:
+        from app.services.firestore_service import sync_document
+        u_data = {
+            "id": new_user.id,
+            "email": new_user.email,
+            "full_name": new_user.full_name,
+            "role": new_user.role,
+            "college_name": new_user.college_name,
+            "department": new_user.department,
+            "is_active": new_user.is_active,
+            "is_superadmin": new_user.is_superadmin,
+            "created_at": new_user.created_at,
+        }
+        sync_document("users", str(new_user.id), u_data)
+    except Exception as e:
+        pass
+
     token = create_access_token({"sub": new_user.email})
     return TokenResponse(
         access_token=token,
