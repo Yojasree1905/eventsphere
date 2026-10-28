@@ -7,3 +7,6 @@ export const register = (payload) =>
   api.post('/auth/register', payload)
 
 export const getMe = () => api.get('/auth/me')
+
+export const googleLogin = (payload) =>
+  api.post('/auth/google', payload)

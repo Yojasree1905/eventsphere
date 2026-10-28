@@ -16,6 +16,16 @@ class RegisterRequest(BaseModel):
     department: Optional[str] = "General"
 
 
+class GoogleAuthRequest(BaseModel):
+    email: EmailStr
+    full_name: str
+    role: Optional[str] = "participant"
+    college_name: Optional[str] = "VIT Vellore"
+    department: Optional[str] = "General"
+    google_id: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"

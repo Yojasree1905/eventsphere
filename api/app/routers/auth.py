@@ -5,7 +5,7 @@ from app.database import get_db
 from app.middleware.auth_middleware import get_current_user
 from app.models.user import User
 from app.models.participant import Participant
-from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserOut
+from app.schemas.auth import GoogleAuthRequest, LoginRequest, RegisterRequest, TokenResponse, UserOut
 from app.services.auth_service import authenticate_user, create_access_token, hash_password
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -92,3 +92,68 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserOut)
 def me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+@router.post("/google", response_model=TokenResponse)
+def google_login(payload: GoogleAuthRequest, db: Session = Depends(get_db)):
+    """
+    Authenticate via Google Sign-In.
+    If the account exists, signs in.
+    If not, automatically provisions an EventSphere account and syncs to Firestore.
+    """
+    import secrets
+    email_clean = payload.email.lower().strip()
+    user = db.query(User).filter(User.email == email_clean).first()
+
+    if not user:
+        random_pwd = secrets.token_urlsafe(16)
+        user = User(
+            email=email_clean,
+            full_name=payload.full_name.strip() or "Google User",
+            hashed_password=hash_password(random_pwd),
+            role=payload.role or "participant",
+            college_name=payload.college_name or "VIT Vellore",
+            department=payload.department or "General",
+            is_active=True,
+            is_superadmin=False,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        if user.role == "participant":
+            p = db.query(Participant).filter(Participant.email == user.email).first()
+            if not p:
+                p = Participant(
+                    full_name=user.full_name,
+                    email=user.email,
+                    college_name=user.college_name,
+                    department=user.department,
+                )
+                db.add(p)
+                db.commit()
+
+        # Real-time Cloud Firestore synchronization
+        try:
+            from app.services.firestore_service import sync_document
+            u_data = {
+                "id": user.id,
+                "email": user.email,
+                "full_name": user.full_name,
+                "role": user.role,
+                "college_name": user.college_name,
+                "department": user.department,
+                "is_active": user.is_active,
+                "is_superadmin": user.is_superadmin,
+                "created_at": user.created_at,
+            }
+            sync_document("users", str(user.id), u_data)
+        except Exception:
+            pass
+
+    token = create_access_token({"sub": user.email})
+    return TokenResponse(
+        access_token=token,
+        user=UserOut.model_validate(user)
+    )
+
