@@ -7,8 +7,19 @@ from reportlab.lib import colors
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 
-CERT_STORAGE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "storage", "certificates")
-os.makedirs(CERT_STORAGE_DIR, exist_ok=True)
+if os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME") or os.environ.get("LAMBDA_TASK_ROOT"):
+    CERT_STORAGE_DIR = "/tmp/certificates"
+else:
+    CERT_STORAGE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "storage", "certificates")
+
+try:
+    os.makedirs(CERT_STORAGE_DIR, exist_ok=True)
+except Exception:
+    CERT_STORAGE_DIR = "/tmp/certificates"
+    try:
+        os.makedirs(CERT_STORAGE_DIR, exist_ok=True)
+    except Exception:
+        pass
 
 
 def generate_qr_image_bytes(data: str) -> io.BytesIO:
