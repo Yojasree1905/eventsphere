@@ -1,19 +1,40 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
-
 import os
+import shutil
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 def _resolve_database_url() -> str:
     env_url = os.environ.get("DATABASE_URL")
     if env_url:
-        # Normalize postgres:// to postgresql:// for SQLAlchemy if provided
         if env_url.startswith("postgres://"):
             return env_url.replace("postgres://", "postgresql://", 1)
         return env_url
+
+    # Serverless writable SQLite handling
     if os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME") or os.environ.get("LAMBDA_TASK_ROOT"):
+        tmp_db = "/tmp/occasio.db"
+        # Locate seed database from backend root or lambda task root
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        backend_dir = os.path.dirname(current_dir)
+        search_paths = [
+            os.path.join(backend_dir, "occasio.db"),
+            os.path.join(os.getcwd(), "backend", "occasio.db"),
+            os.path.join(os.getcwd(), "occasio.db"),
+            "/var/task/backend/occasio.db",
+            "/var/task/occasio.db",
+        ]
+        for src in search_paths:
+            if os.path.isfile(src):
+                try:
+                    if not os.path.exists(tmp_db) or os.path.getsize(tmp_db) < 1000:
+                        shutil.copyfile(src, tmp_db)
+                        print(f"[Vercel Init] Copied seed db from {src} to {tmp_db}")
+                    break
+                except Exception as e:
+                    print(f"[Vercel Init] Failed copy from {src}: {e}")
         return "sqlite:////tmp/occasio.db"
+
+    # Local development
     try:
         test_file = "./.test_write"
         with open(test_file, "w") as f:

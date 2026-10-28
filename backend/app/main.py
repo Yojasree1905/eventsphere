@@ -121,6 +121,7 @@ app.include_router(universities.router)
 app.include_router(judges.router)
 
 
+@app.get("/health")
 @app.get("/api/health")
 def health():
     return {"status": "ok", "app": "EventSphere"}
