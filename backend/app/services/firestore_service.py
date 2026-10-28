@@ -262,9 +262,12 @@ def batch_export_to_firestore(db) -> Dict[str, int]:
             "id": sc.id,
             "event_id": sc.event_id,
             "participant_id": sc.participant_id,
-            "team_id": sc.team_id,
+            "criteria_scores": sc.criteria_scores or {},
             "total_score": sc.total_score,
             "rank": sc.rank,
+            "badge": sc.badge,
+            "judge_remarks": sc.judge_remarks,
+            "evaluated_at": sc.evaluated_at,
         }
         sync_document("evaluations", str(sc.id), sc_data)
         counts["evaluations"] += 1
