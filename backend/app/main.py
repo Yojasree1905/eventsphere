@@ -57,6 +57,11 @@ app = FastAPI(
     version="2.0.0",
 )
 
+@app.on_event("startup")
+def startup_firestore():
+    from app.services.firestore_service import init_firestore
+    init_firestore()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

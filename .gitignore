@@ -19,6 +19,8 @@ __pycache__/
 # ── Environment ───────────────────
 .env
 *.env.local
+serviceAccountKey.json
+firebase-debug.log
 
 # ── OS ────────────────────────────
 .DS_Store
