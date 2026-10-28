@@ -85,16 +85,13 @@ def startup_firestore():
         print(f"[Firestore Startup Warning] {e}")
 
 @app.middleware("http")
-async def normalize_api_path(request: Request, call_next):
-    # If the incoming path does not start with /api and does not start with /assets
-    # (e.g. if Vercel stripped the /api prefix during rewrite), normalize it to /api/*
-    path = request.scope.get("path", "")
-    if path and not path.startswith("/api") and not path.startswith("/assets") and not path.startswith("/docs") and not path.startswith("/openapi.json"):
-        # Check if stripping /api made it an API route like /auth/login, /events, etc.
-        first_segment = path.strip("/").split("/")[0] if path.strip("/") else ""
-        if first_segment in ["auth", "events", "schedules", "participants", "registrations", "monitoring", "feedbacks", "scores", "certificates", "teams", "attendance", "recommendations", "universities", "judges", "health"]:
-            request.scope["path"] = "/api" + path
-    return await call_next(request)
+async def error_handling_middleware(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception as e:
+        import traceback
+        from fastapi.responses import PlainTextResponse
+        return PlainTextResponse(f"BACKEND EXCEPTION: {traceback.format_exc()}", status_code=500)
 
 app.add_middleware(
     CORSMiddleware,
