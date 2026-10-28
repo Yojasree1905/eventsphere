@@ -29,6 +29,7 @@ def _generate_verification_hash(cert_id: str, participant_id: int, event_id: int
 @router.post("/generate", response_model=List[CertificateOut], status_code=201)
 def generate_event_certificates(
     payload: CertificateGenerateRequest,
+    request: Request,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
@@ -84,7 +85,8 @@ def generate_event_certificates(
 
         cert_id = f"OCC-{today.year}-{uuid.uuid4().hex[:8].upper()}"
         v_hash = _generate_verification_hash(cert_id, participant.id, event.id)
-        verification_url = f"http://127.0.0.1:8000/verify/{cert_id}"
+        app_base = os.environ.get("APP_BASE_URL") or str(request.base_url).rstrip("/")
+        verification_url = f"{app_base}/verify/{cert_id}"
 
         # Render PDF with ReportLab + QR Code
         pdf_path = build_certificate_pdf(
@@ -232,6 +234,7 @@ def verify_certificate_public(
 @router.get("/download/{certificate_id}")
 def download_certificate_pdf(
     certificate_id: str,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """
@@ -244,6 +247,7 @@ def download_certificate_pdf(
     filepath = os.path.join(CERT_STORAGE_DIR, cert.pdf_filename)
     if not os.path.exists(filepath):
         # Regenerate on the fly if needed
+        app_base = os.environ.get("APP_BASE_URL") or str(request.base_url).rstrip("/")
         build_certificate_pdf(
             certificate_id=cert.certificate_id,
             recipient_name=cert.participant.full_name,
@@ -252,7 +256,7 @@ def download_certificate_pdf(
             host_college=cert.event.college_name,
             cert_type=cert.cert_type,
             issue_date=cert.issue_date,
-            verification_url=f"http://localhost:5173/verify/{cert.certificate_id}",
+            verification_url=f"{app_base}/verify/{cert.certificate_id}",
         )
 
     return FileResponse(
