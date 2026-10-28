@@ -15,6 +15,7 @@ __pycache__/
 *.db
 *.sqlite3
 !backend/occasio.db
+!api/occasio.db
 
 # ── Environment ───────────────────
 .env
