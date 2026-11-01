@@ -1,23 +1,42 @@
 import os
 import sys
 import shutil
+import traceback
+from fastapi import FastAPI
+from fastapi.responses import PlainTextResponse
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 if CURRENT_DIR not in sys.path:
     sys.path.insert(0, CURRENT_DIR)
 
-# Serverless SQLite handling
-serverless_indicators = ["VERCEL", "VERCEL_ENV", "VERCEL_REGION", "AWS_LAMBDA_FUNCTION_NAME", "LAMBDA_TASK_ROOT"]
-if any(os.environ.get(k) for k in serverless_indicators):
-    tmp_db = "/tmp/occasio.db"
-    src_db = os.path.join(CURRENT_DIR, "occasio.db")
-    if not os.path.exists(tmp_db) and os.path.isfile(src_db):
+# Disable reportlab accelerators & configure temp font cache
+os.environ["RL_CACHES"] = "/tmp"
+os.environ["REPORTLAB_DISABLE_ACCEL"] = "1"
+
+# Prepare /tmp db
+tmp_db = "/tmp/occasio.db"
+for db_candidate in [os.path.join(CURRENT_DIR, "occasio.db"), os.path.join(os.path.dirname(CURRENT_DIR), "occasio.db")]:
+    if os.path.isfile(db_candidate) and (not os.path.exists(tmp_db) or os.path.getsize(tmp_db) < 1000):
         try:
-            shutil.copyfile(src_db, tmp_db)
+            shutil.copyfile(db_candidate, tmp_db)
+            break
         except Exception:
             pass
 
-from app.main import app
+startup_error = None
+try:
+    from app.main import app as _actual_app
+except Exception as e:
+    startup_error = traceback.format_exc()
+    print(f"[Backend Startup Error] {startup_error}")
+
+if startup_error:
+    app = FastAPI(title="EventSphere Diagnostic")
+    @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+    def error_handler(path: str):
+        return PlainTextResponse(f"BACKEND STARTUP ERROR:\n\n{startup_error}", status_code=200)
+else:
+    app = _actual_app
 
 if __name__ == "__main__":
     import uvicorn
