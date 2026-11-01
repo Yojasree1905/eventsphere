@@ -143,7 +143,8 @@ def health():
 
 
 # ── Single-Host Unified Frontend Mounting ────────────────────────────────────
-def _find_frontend_dist() -> str | None:
+from typing import Optional
+def _find_frontend_dist() -> Optional[str]:
     current_file = os.path.abspath(__file__)
     candidates = [
         # Relative to backend/app/main.py -> ../../../frontend/dist
@@ -199,4 +200,5 @@ if FRONTEND_DIST_DIR and os.path.exists(FRONTEND_DIST_DIR):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+
 
