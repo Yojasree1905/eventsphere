@@ -34,7 +34,18 @@ def _resolve_database_url() -> str:
                     print(f"[Vercel Init] Failed copy from {src}: {e}")
         return "sqlite:////tmp/occasio.db"
 
-    # Local development
+    # Local development: resolve absolute path to avoid split databases
+    curr_dir = os.path.dirname(os.path.abspath(__file__))
+    backend_dir = os.path.dirname(curr_dir)
+    backend_db = os.path.join(backend_dir, "occasio.db")
+    if os.path.isfile(backend_db):
+        return f"sqlite:///{backend_db.replace(chr(92), '/')}"
+
+    root_dir = os.path.dirname(backend_dir)
+    root_db = os.path.join(root_dir, "occasio.db")
+    if os.path.isfile(root_db):
+        return f"sqlite:///{root_db.replace(chr(92), '/')}"
+
     try:
         test_file = "./.test_write"
         with open(test_file, "w") as f:

@@ -125,29 +125,57 @@ def health():
 
 
 # ── Single-Host Unified Frontend Mounting ────────────────────────────────────
-# Locate frontend/dist relative to backend root
-FRONTEND_DIST_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "frontend", "dist")
-)
+def _find_frontend_dist() -> str | None:
+    current_file = os.path.abspath(__file__)
+    candidates = [
+        # Relative to backend/app/main.py -> ../../../frontend/dist
+        os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(current_file))), "frontend", "dist")),
+        # Relative to current working dir
+        os.path.abspath(os.path.join(os.getcwd(), "frontend", "dist")),
+        os.path.abspath(os.path.join(os.getcwd(), "dist")),
+        # Subdirectory in backend
+        os.path.abspath(os.path.join(os.path.dirname(current_file), "dist")),
+        os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(current_file)), "dist")),
+        os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(current_file)), "static")),
+        "/app/frontend/dist",
+        "/var/task/frontend/dist",
+    ]
+    for p in candidates:
+        if p and os.path.isdir(p) and os.path.isfile(os.path.join(p, "index.html")):
+            return p
+    return None
 
-if os.path.exists(FRONTEND_DIST_DIR):
+FRONTEND_DIST_DIR = _find_frontend_dist()
+
+if FRONTEND_DIST_DIR and os.path.exists(FRONTEND_DIST_DIR):
     assets_dir = os.path.join(FRONTEND_DIST_DIR, "assets")
     if os.path.exists(assets_dir):
         app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
+    # Serve favicon & icons directly if requested
+    for static_file in ["favicon.svg", "icons.svg"]:
+        f_path = os.path.join(FRONTEND_DIST_DIR, static_file)
+        if os.path.isfile(f_path):
+            @app.get(f"/{static_file}", include_in_schema=False)
+            async def serve_static_file(target=f_path):
+                return FileResponse(target)
+
+    # Root route serves index.html
+    @app.get("/", include_in_schema=False)
+    async def serve_root():
+        return FileResponse(os.path.join(FRONTEND_DIST_DIR, "index.html"))
+
     # Serve index.html for all non-API paths (SPA client-side routing fallback)
-    @app.get("/{full_path:path}")
+    @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_spa(full_path: str):
-        # Allow API calls to proceed or 404 naturally
-        if full_path.startswith("api/") or full_path == "api":
+        if full_path.startswith("api/") or full_path == "api" or full_path.startswith("docs") or full_path.startswith("openapi.json"):
             raise HTTPException(status_code=404, detail="API endpoint not found")
 
         target_file = os.path.join(FRONTEND_DIST_DIR, full_path)
         if os.path.isfile(target_file):
             return FileResponse(target_file)
 
-        index_file = os.path.join(FRONTEND_DIST_DIR, "index.html")
-        return FileResponse(index_file)
+        return FileResponse(os.path.join(FRONTEND_DIST_DIR, "index.html"))
 
 
 if __name__ == "__main__":
