@@ -2,11 +2,11 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "services": {
     "frontend": {
-      "root": "frontend/",
+      "root": "frontend",
       "framework": "vite"
     },
     "backend": {
-      "root": "backend/",
+      "root": "backend",
       "entrypoint": "main:app"
     }
   },
@@ -19,12 +19,6 @@
     },
     {
       "source": "/api/:path*",
-      "destination": {
-        "service": "backend"
-      }
-    },
-    {
-      "source": "/api/(.*)",
       "destination": {
         "service": "backend"
       }
