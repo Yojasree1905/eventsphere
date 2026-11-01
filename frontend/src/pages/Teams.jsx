@@ -27,22 +27,30 @@ export function Teams() {
   const [joinParticipantId, setJoinParticipantId] = useState('')
 
   useEffect(() => {
-    getEvents().then((evts) => {
+    getEvents().then((res) => {
+      const evts = Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : [])
       setEvents(evts)
       if (evts.length > 0) setSelectedEventId(evts[0].id)
     }).catch(console.error)
 
     getParticipants().then((res) => {
-      setParticipants(res.data || res)
+      const parts = Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : [])
+      setParticipants(parts)
     }).catch(console.error)
   }, [])
 
   const loadTeams = (eventId) => {
-    if (!eventId) return
+    if (!eventId) {
+      setTeams([])
+      return
+    }
     setLoading(true)
     api.get(`/teams/event/${eventId}`)
-      .then((res) => setTeams(res.data))
-      .catch(console.error)
+      .then((res) => setTeams(Array.isArray(res.data) ? res.data : []))
+      .catch((err) => {
+        console.error('Failed to load teams:', err)
+        setTeams([])
+      })
       .finally(() => setLoading(false))
   }
 
@@ -108,7 +116,7 @@ export function Teams() {
             onChange={(e) => setSelectedEventId(e.target.value)}
             className="bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            {events.map((evt) => (
+            {(events || []).map((evt) => (
               <option key={evt.id} value={evt.id}>
                 {evt.title} ({evt.college_name})
               </option>
@@ -161,7 +169,7 @@ export function Teams() {
                     <span>{t.members_count} Joined</span>
                   </div>
                   <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                    {t.members.map((m) => (
+                    {(t.members || []).map((m) => (
                       <div key={m.participant_id} className="text-xs bg-slate-950/60 p-2 rounded-lg border border-slate-800/80 flex justify-between items-center">
                         <span className="font-medium text-slate-200">{m.full_name}</span>
                         <span className="text-[10px] text-slate-400">{m.college_name || 'University'}</span>
@@ -200,7 +208,7 @@ export function Teams() {
                 required
               >
                 <option value="">-- Choose Candidate --</option>
-                {participants.map((p) => (
+                {(participants || []).map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.full_name} ({p.college_name})
                   </option>
@@ -241,7 +249,7 @@ export function Teams() {
                 required
               >
                 <option value="">-- Choose Candidate --</option>
-                {participants.map((p) => (
+                {(participants || []).map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.full_name} ({p.college_name})
                   </option>

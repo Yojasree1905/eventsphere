@@ -52,7 +52,7 @@ export function Evaluations() {
       .finally(() => setLoading(false))
 
     // Fetch assigned judges
-    client.get(`/api/judges/assigned/${selectedEventId}`)
+    client.get(`/judges/assigned/${selectedEventId}`)
       .then((res) => setAssignedJudges(res.data || []))
       .catch(() => setAssignedJudges([]))
   }, [selectedEventId])

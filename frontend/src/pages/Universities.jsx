@@ -29,7 +29,7 @@ export function Universities() {
   const fetchUniversities = async () => {
     try {
       setLoading(true)
-      const res = await client.get(`/api/universities?search=${encodeURIComponent(search)}`)
+      const res = await client.get(`/universities?search=${encodeURIComponent(search)}`)
       setUniversities(res.data || [])
     } catch (err) {
       console.error('Failed to fetch universities:', err)
