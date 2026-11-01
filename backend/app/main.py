@@ -25,18 +25,22 @@ from app.routers import (
     judges,
 )
 
-# If running on Vercel, copy the pre-seeded SQLite database to writable /tmp
-if os.environ.get("VERCEL"):
+# If running on Vercel / serverless, ensure pre-seeded database is copied to writable /tmp
+serverless_indicators = ["VERCEL", "VERCEL_ENV", "VERCEL_REGION", "AWS_LAMBDA_FUNCTION_NAME", "LAMBDA_TASK_ROOT", "AWS_EXECUTION_ENV"]
+if any(os.environ.get(k) for k in serverless_indicators):
     import shutil
     BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    db_source = os.path.join(BACKEND_DIR, "occasio.db")
+    ROOT_DIR = os.path.dirname(BACKEND_DIR)
     tmp_db = "/tmp/occasio.db"
-    if not os.path.exists(tmp_db) and os.path.exists(db_source):
-        try:
-            shutil.copyfile(db_source, tmp_db)
-            print("[Vercel Init] Seed database copied to /tmp/occasio.db")
-        except Exception as e:
-            print(f"[Vercel Init] Failed copying database: {e}")
+    for db_src in [os.path.join(BACKEND_DIR, "occasio.db"), os.path.join(ROOT_DIR, "occasio.db"), "/var/task/backend/occasio.db"]:
+        if os.path.isfile(db_src):
+            try:
+                if not os.path.exists(tmp_db) or os.path.getsize(tmp_db) < 1000:
+                    shutil.copyfile(db_src, tmp_db)
+                    print(f"[Vercel Init] Seed database copied from {db_src} to {tmp_db}")
+                break
+            except Exception as e:
+                print(f"[Vercel Init] Failed copying database from {db_src}: {e}")
 
 # ── Create all tables (EventSphere full schema) ──────────────────────────────
 try:
@@ -67,7 +71,10 @@ def _seed_admin() -> None:
     except Exception as e:
         print(f"[Init Warning] _seed_admin: {e}")
 
-_seed_admin()
+try:
+    _seed_admin()
+except Exception as e:
+    print(f"[Init Warning] _seed_admin call: {e}")
 
 # ── Application ──────────────────────────────────────────────────────────────
 app = FastAPI(

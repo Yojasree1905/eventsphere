@@ -3,6 +3,21 @@ import shutil
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def _is_serverless_or_readonly() -> bool:
+    serverless_vars = ["VERCEL", "VERCEL_ENV", "VERCEL_REGION", "AWS_LAMBDA_FUNCTION_NAME", "LAMBDA_TASK_ROOT", "AWS_EXECUTION_ENV"]
+    if any(os.environ.get(k) for k in serverless_vars):
+        return True
+    try:
+        test_file = "./.test_write_probe"
+        with open(test_file, "w") as f:
+            f.write("1")
+        if os.path.exists(test_file):
+            os.remove(test_file)
+        return False
+    except Exception:
+        return True
+
+
 def _resolve_database_url() -> str:
     env_url = os.environ.get("DATABASE_URL")
     if env_url:
@@ -10,14 +25,15 @@ def _resolve_database_url() -> str:
             return env_url.replace("postgres://", "postgresql://", 1)
         return env_url
 
-    # Serverless writable SQLite handling
-    if os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME") or os.environ.get("LAMBDA_TASK_ROOT"):
+    # Serverless / Read-only container handling (Vercel, AWS Lambda)
+    if _is_serverless_or_readonly():
         tmp_db = "/tmp/occasio.db"
-        # Locate seed database from backend root or lambda task root
         current_dir = os.path.dirname(os.path.abspath(__file__))
         backend_dir = os.path.dirname(current_dir)
+        root_dir = os.path.dirname(backend_dir)
         search_paths = [
             os.path.join(backend_dir, "occasio.db"),
+            os.path.join(root_dir, "occasio.db"),
             os.path.join(os.getcwd(), "backend", "occasio.db"),
             os.path.join(os.getcwd(), "occasio.db"),
             "/var/task/backend/occasio.db",
@@ -46,15 +62,7 @@ def _resolve_database_url() -> str:
     if os.path.isfile(root_db):
         return f"sqlite:///{root_db.replace(chr(92), '/')}"
 
-    try:
-        test_file = "./.test_write"
-        with open(test_file, "w") as f:
-            f.write("1")
-        if os.path.exists(test_file):
-            os.remove(test_file)
-        return "sqlite:///./occasio.db"
-    except Exception:
-        return "sqlite:////tmp/occasio.db"
+    return "sqlite:///./occasio.db"
 
 
 class Settings(BaseSettings):
