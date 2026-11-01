@@ -29,10 +29,21 @@ from app.routers import (
 serverless_indicators = ["VERCEL", "VERCEL_ENV", "VERCEL_REGION", "AWS_LAMBDA_FUNCTION_NAME", "LAMBDA_TASK_ROOT", "AWS_EXECUTION_ENV"]
 if any(os.environ.get(k) for k in serverless_indicators):
     import shutil
-    BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    ROOT_DIR = os.path.dirname(BACKEND_DIR)
+    CURRENT_APP_DIR = os.path.dirname(os.path.abspath(__file__))
+    PARENT_DIR = os.path.dirname(CURRENT_APP_DIR)
+    ROOT_DIR = os.path.dirname(PARENT_DIR)
     tmp_db = "/tmp/occasio.db"
-    for db_src in [os.path.join(BACKEND_DIR, "occasio.db"), os.path.join(ROOT_DIR, "occasio.db"), "/var/task/backend/occasio.db"]:
+    candidate_dbs = [
+        os.path.join(PARENT_DIR, "occasio.db"),
+        os.path.join(CURRENT_APP_DIR, "occasio.db"),
+        os.path.join(ROOT_DIR, "occasio.db"),
+        os.path.join(ROOT_DIR, "backend", "occasio.db"),
+        os.path.join(ROOT_DIR, "api", "occasio.db"),
+        "/var/task/api/occasio.db",
+        "/var/task/backend/occasio.db",
+        "/var/task/occasio.db",
+    ]
+    for db_src in candidate_dbs:
         if os.path.isfile(db_src):
             try:
                 if not os.path.exists(tmp_db) or os.path.getsize(tmp_db) < 1000:
@@ -188,3 +199,4 @@ if FRONTEND_DIST_DIR and os.path.exists(FRONTEND_DIST_DIR):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+

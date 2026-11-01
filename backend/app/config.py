@@ -29,13 +29,18 @@ def _resolve_database_url() -> str:
     if _is_serverless_or_readonly():
         tmp_db = "/tmp/occasio.db"
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        backend_dir = os.path.dirname(current_dir)
-        root_dir = os.path.dirname(backend_dir)
+        parent_dir = os.path.dirname(current_dir)
+        root_dir = os.path.dirname(parent_dir)
         search_paths = [
-            os.path.join(backend_dir, "occasio.db"),
+            os.path.join(parent_dir, "occasio.db"),
+            os.path.join(current_dir, "occasio.db"),
             os.path.join(root_dir, "occasio.db"),
+            os.path.join(root_dir, "backend", "occasio.db"),
+            os.path.join(root_dir, "api", "occasio.db"),
             os.path.join(os.getcwd(), "backend", "occasio.db"),
+            os.path.join(os.getcwd(), "api", "occasio.db"),
             os.path.join(os.getcwd(), "occasio.db"),
+            "/var/task/api/occasio.db",
             "/var/task/backend/occasio.db",
             "/var/task/occasio.db",
         ]
