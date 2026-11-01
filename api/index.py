@@ -1,9 +1,6 @@
 import os
 import sys
 import shutil
-import traceback
-from fastapi import FastAPI
-from fastapi.responses import PlainTextResponse
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 if CURRENT_DIR not in sys.path:
@@ -23,20 +20,7 @@ for db_candidate in [os.path.join(CURRENT_DIR, "occasio.db"), os.path.join(os.pa
         except Exception:
             pass
 
-startup_error = None
-try:
-    from app.main import app as _actual_app
-except Exception as e:
-    startup_error = traceback.format_exc()
-    print(f"[Backend Startup Error] {startup_error}")
-
-if startup_error:
-    app = FastAPI(title="EventSphere Diagnostic")
-    @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
-    def error_handler(path: str):
-        return PlainTextResponse(f"BACKEND STARTUP ERROR:\n\n{startup_error}", status_code=200)
-else:
-    app = _actual_app
+from app.main import app
 
 if __name__ == "__main__":
     import uvicorn
