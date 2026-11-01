@@ -1,11 +1,6 @@
 import io
 import os
-import qrcode
 from datetime import date
-from reportlab.lib.pagesizes import letter, landscape
-from reportlab.lib import colors
-from reportlab.pdfgen import canvas
-from reportlab.lib.utils import ImageReader
 
 if os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME") or os.environ.get("LAMBDA_TASK_ROOT"):
     CERT_STORAGE_DIR = "/tmp/certificates"
@@ -24,6 +19,8 @@ except Exception:
 
 def generate_qr_image_bytes(data: str) -> io.BytesIO:
     """Generates QR code as a PNG in-memory bytes buffer."""
+    import qrcode
+
     qr = qrcode.QRCode(
         version=1,
         error_correction=qrcode.constants.ERROR_CORRECT_M,
@@ -49,6 +46,10 @@ def build_certificate_pdf(
     issue_date: date,
     verification_url: str,
 ) -> str:
+    from reportlab.lib.pagesizes import letter, landscape
+    from reportlab.lib import colors
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.utils import ImageReader
     """
     Renders a landscape letter PDF certificate with modern blue-slate borders,
     gold/silver typography accents, dynamic metadata, and verification QR code.
