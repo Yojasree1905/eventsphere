@@ -16,7 +16,7 @@
 
 **EventSphere (codenamed Occasio)** is a production-grade, full-stack multi-university event management, discovery, and credentialing platform. Engineered to eliminate fragmented, campus-isolated portals, EventSphere unites students, university organizers, platform administrators, and expert jurors into a single high-performance digital ecosystem.
 
-[Explore Live Demo](https://eventsphere-vankireddis2023-vitstudentas-projects.vercel.app) • [API Documentation (Swagger)](http://localhost:8000/docs) • [Architecture Report](OCCASIO_PROJECT_REPORT.md)
+[Explore Live Demo](https://eventsphere-vankireddis2023-vitstudentas-projects.vercel.app) • [📄 Full Architecture & Workflow Report (DOCX)](docs/EventSphere_System_Architecture_and_Workflows.docx) • [API Documentation (Swagger)](http://localhost:8000/docs) • [Architecture Report (MD)](OCCASIO_PROJECT_REPORT.md)
 
 </div>
 
