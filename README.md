@@ -22,20 +22,21 @@
 
 ---
 
-## 📋 Table of Contents
+## 📑 Table of Contents
 1. [Core Platform Capabilities](#-core-platform-capabilities)
-2. [High-Level System Architecture](#-high-level-system-architecture)
-3. [Role-Based Operational Workflows](#-role-based-operational-workflows)
-   - [3.1 Student / Participant Workflow](#31-student--participant-workflow)
-   - [3.2 Event Organizer Workflow](#32-event-organizer-workflow)
-   - [3.3 Platform Administrator / Superadmin Workflow](#33-platform-administrator--superadmin-workflow)
-   - [3.4 Judge & Jury Evaluation Workflow](#34-judge--jury-evaluation-workflow)
-4. [Cryptographic Credential Authority](#-cryptographic-credential-authority)
-5. [Modular Backend & API Taxonomy](#-modular-backend--api-taxonomy)
-6. [Database Schema & Data Models](#-database-schema--data-models)
-7. [Local Development & Quick Start](#-local-development--quick-start)
-8. [Automated Testing & Quality Assurance](#-automated-testing--quality-assurance)
-9. [Production Deployment (Vercel Edge & Serverless)](#-production-deployment-vercel-edge--serverless)
+2. [Horizontal High-Level System Architecture](#-high-level-system-architecture)
+3. [Unified Master Event Lifecycle (All 4 Roles)](#-unified-master-lifecycle-flowchart-all-4-roles)
+4. [Role-Based Horizontal Flowcharts](#-role-based-operational-workflows)
+   - [4.1 Student / Participant Horizontal Flowchart](#41-student--participant-workflow)
+   - [4.2 Event Organizer Horizontal Flowchart](#42-event-organizer-workflow)
+   - [4.3 Platform Administrator / Superadmin Horizontal Flowchart](#43-platform-administrator--superadmin-workflow)
+   - [4.4 Judge & Jury Evaluation Horizontal Flowchart](#44-judge--jury-evaluation-workflow)
+5. [Cryptographic Credential Authority](#-cryptographic-credential-authority)
+6. [Modular Backend & API Taxonomy](#-modular-backend--api-taxonomy)
+7. [Database Schema & Data Models](#-database-schema--data-models)
+8. [Local Development & Quick Start](#-local-development--quick-start)
+9. [Automated Testing & Quality Assurance](#-automated-testing--quality-assurance)
+10. [Production Deployment (Vercel Edge & Serverless)](#-production-deployment-vercel-edge--serverless)
 
 ---
 
@@ -55,474 +56,355 @@
 
 ## 🏛️ High-Level System Architecture
 
-EventSphere employs a decoupled modern architecture combining a reactive client Single-Page Application (SPA) with a high-throughput asynchronous Python FastAPI backend, supported by dual-layer persistence (SQLAlchemy relational database with Google Cloud Firestore synchronization).
+The following landscape diagram outlines the end-to-end dataflow across all five system tiers from client interaction down to cloud replication:
 
 ```mermaid
-flowchart TD
-    subgraph ClientLayer ["1. Client Application Layer (React 19 + Vite)"]
-        UI["React 19 SPA (Tailwind CSS v4 & Lucide Icons)"]
-        Router["React Router v7 (Declarative Client Routing)"]
-        AuthCtx["Auth Context (JWT State & Session Storage)"]
-        AxiosClient["Axios HTTP Interceptor (Auto Bearer Injection & Refresh)"]
-        UI --> Router --> AuthCtx --> AxiosClient
+flowchart LR
+    subgraph Client ["1. Client (React 19)"]
+        UI["React 19 SPA<br/>(Tailwind v4)"]
+        Router["React Router v7<br/>(Client Routing)"]
+        AuthCtx["Auth Context<br/>& Axios JWT"]
+        UI --> Router --> AuthCtx
     end
 
-    subgraph IngestionLayer ["2. Network & Edge Routing Layer"]
-        VercelCDN["Vercel Global Edge Network (Anycast CDN / bom1)"]
-        UnifiedHost["Unified Host Server (Uvicorn :8000 Proxy)"]
-        AxiosClient -->|"HTTPS / REST Requests"| VercelCDN
-        AxiosClient -.->|"Local Development"| UnifiedHost
-        VercelCDN -->|"/(.*) Static SPA Assets"| UI
-        VercelCDN -->|"/api/(.*) API Ingestion"| FastAPIServer["FastAPI Gateway (Python 3.12 ASGI)"]
-        UnifiedHost -->|"Static Dist & API"| FastAPIServer
+    subgraph Edge ["2. Ingestion & Edge"]
+        Vercel["Vercel Global Edge<br/>(Anycast CDN)"]
+        Unified["Unified Host Server<br/>(Uvicorn :8000)"]
     end
 
-    subgraph SecurityLayer ["3. Security & Middleware Layer"]
-        FastAPIServer --> CORSMW["CORS Middleware"]
-        CORSMW --> JWTAuth["JWT Authentication Middleware"]
-        JWTAuth --> RBAC["Role-Based Access Control (Admin, Organizer, Student, Judge)"]
+    AuthCtx -->|"HTTPS REST"| Vercel
+    AuthCtx -.->|"Local Dev"| Unified
+
+    subgraph Backend ["3. Application Backend (FastAPI Python 3.12)"]
+        direction TB
+        Gate["FastAPI Gateway"]
+        AuthMW["JWT & RBAC Middleware"]
+        Gate --> AuthMW
+        
+        subgraph Routers ["Domain Routers"]
+            direction LR
+            R1["Auth & SSO<br/>(/api/auth)"]
+            R2["Events & Proposals<br/>(/api/events)"]
+            R3["Squads & Teams<br/>(/api/teams)"]
+            R4["QR Attendance<br/>(/api/attendance)"]
+            R5["Jury Rubrics<br/>(/api/judges)"]
+            R6["Certificates<br/>(/api/certificates)"]
+        end
+        AuthMW --> Routers
     end
 
-    subgraph RouterLayer ["4. Modular Business Domain Routers"]
-        RBAC --> R_Auth["Auth & Google OAuth Router (/api/auth)"]
-        RBAC --> R_Events["Events & Proposals Router (/api/events)"]
-        RBAC --> R_Univ["University Governance Router (/api/universities)"]
-        RBAC --> R_Teams["Squads & Hackathon Teams Router (/api/teams)"]
-        RBAC --> R_Sched["Agenda & Tracks Router (/api/schedules)"]
-        RBAC --> R_Attend["QR Attendance Engine (/api/attendance)"]
-        RBAC --> R_Judge["Rubric Jury Evaluation (/api/judges)"]
-        RBAC --> R_Cert["Verifiable Credentials Router (/api/certificates)"]
-        RBAC --> R_Rec["AI/ML Recommendations Router (/api/recommendations)"]
+    Vercel -->|"API /api/*"| Gate
+    Unified -->|"Proxy"| Gate
+    Vercel -->|"Static /*"| UI
+
+    subgraph Engines ["4. Engines"]
+        direction TB
+        E1["JWT Guard<br/>(HS256)"]
+        E2["Jury Engine<br/>(100-pt Rubric)"]
+        E3["Cert Mint<br/>(ReportLab+SHA256)"]
+        E4["AI Matcher<br/>(Collaborative)"]
     end
 
-    subgraph ServiceLayer ["5. Processing & Generation Engines"]
-        R_Cert --> CertEngine["ReportLab Cryptographic PDF Engine"]
-        R_Attend --> QREngine["Vector QR Code Encoding Engine"]
-        R_Rec --> AIEngine["Collaborative Heuristic Recommendation Model"]
-        R_Events --> SyncService["Dual-Write Cloud Sync Engine"]
-        R_Teams --> SyncService
+    Routers --> Engines
+
+    subgraph Storage ["5. Dual-Sync Data Tier"]
+        direction TB
+        SQL[("Primary Relational DB<br/>SQLite 3.45 (WAL Mode)<br/>13 Normalized Tables")]
+        FS[("Google Cloud Firestore<br/>Real-Time Document Store<br/>NoSQL Cloud Sync")]
+        SyncService[["Firestore Background<br/>Dual-Sync Service"]]
     end
 
-    subgraph DataLayer ["6. Dual-Persistence Storage Layer"]
-        SQLAlchemy["SQLAlchemy 2.0 ORM Engine"]
-        SQLiteDB[("Primary Relational Database (SQLite / Postgres)")]
-        FirestoreDB[("Google Cloud Firestore (Real-Time Cloud Replica)")]
-        RouterLayer --> SQLAlchemy --> SQLiteDB
-        SyncService --> FirestoreDB
-    end
+    Engines -->|"SQLAlchemy 2.0 ORM"| SQL
+    SQL -.->|"Write-Through Sync"| SyncService
+    SyncService -->|"gRPC Batch Write"| FS
+
+    classDef client fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#0f172a;
+    classDef edge fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a;
+    classDef backend fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#0f172a;
+    classDef storage fill:#fffbeb,stroke:#d97706,stroke-width:2px,color:#0f172a;
+    classDef sync fill:#fdf4ff,stroke:#a855f7,stroke-width:2px,color:#0f172a;
+
+    class UI,Router,AuthCtx client;
+    class Vercel,Unified edge;
+    class Gate,AuthMW,R1,R2,R3,R4,R5,R6,E1,E2,E3,E4 backend;
+    class SQL storage;
+    class FS,SyncService sync;
 ```
 
 ---
 
-## 🔄 Role-Based Operational Workflows
+## 🔄 Unified Master Lifecycle Flowchart (All 4 Roles)
 
-### 🌟 Unified Master Lifecycle Flow Diagram (All 4 Roles)
-This end-to-end master flowchart illustrates how all four stakeholders—**Superadmin, Organizer, Student, and Judge**—interact collaboratively across the 5 distinct phases of an event's lifecycle:
+The diagram below maps the complete event lifecycle from institutional onboarding through competition, jury scoring, certificate minting, and employer verification, showing how the four roles interact horizontally:
 
 ```mermaid
-flowchart TD
-    %% Phase 1
-    subgraph Phase1 ["Phase 1: Institutional Foundation & Event Conception"]
-        A1["Platform Admin: Onboard Partner Universities"] --> O1["Organizer: Author Event Proposal"]
-        O1 --> A2["Platform Admin: Review & Sanction Proposal (Status: APPROVED)"]
+flowchart LR
+    subgraph P1 ["Phase 1: Institutional Onboarding"]
+        direction TB
+        A1["🛡️ Admin creates Universities & Assigns Coordinators"] --> A2["📅 Organizer registers via institutional domain"]
+        A2 --> A3["🛡️ Admin grants Event Organizer privileges"]
     end
 
-    %% Phase 2
-    subgraph Phase2 ["Phase 2: Agenda Scheduling & Cross-Campus Team Assembly"]
-        A2 --> O2["Organizer: Structure Multi-Day Agenda & Time Slots"]
-        A2 --> S1["Student: Discover Sanctioned Event in Public Catalog"]
-        S1 --> S2{"Individual or Team Event?"}
-        S2 -->|"Individual"| S3["Student: Register for Event (Status: REGISTERED)"]
-        S2 -->|"Team / Hackathon"| S4["Student Leader: Create Squad & Generate 6-Char Invite Code"]
-        S4 --> S5["Cross-Campus Teammates: Join Squad via Invite Code"]
+    subgraph P2 ["Phase 2: Proposal & Review"]
+        direction TB
+        O1["📅 Organizer drafts Event Proposal & Rules"] --> O2["📅 Organizer submits proposal to Approval Queue"]
+        O2 --> A4{"🛡️ Admin Review<br/>Criteria & Schedule"}
+        A4 -- "Needs Revision" --> O1
+        A4 -- "Approved" --> O3["📅 Event published to Multi-University Catalog"]
     end
 
-    %% Phase 3
-    subgraph Phase3 ["Phase 3: Event Day Venue Operations & Live Check-In"]
-        O2 --> O3["Organizer: Display Dynamic Time-Stamped Venue QR Code"]
-        S3 & S5 --> S6["Student: Scan Venue QR via Mobile Camera"]
-        O3 -.-> S6
-        S6 --> SYS1["Backend: Ingest Attendance & Update Status to ATTENDED"]
+    subgraph P3 ["Phase 3: Squad Assembly & Registration"]
+        direction TB
+        S1["👤 Student explores catalog with AI Matching"] --> S2["👤 Student registers as Solo or creates Squad"]
+        S2 --> S3["👤 Student shares 6-char Squad Invite Code"]
+        S3 --> S4["👤 Inter-college teammates join Squad"]
+        S4 --> S5["🎫 Confirmed Ticket & Dynamic QR Pass issued"]
     end
 
-    %% Phase 4
-    subgraph Phase4 ["Phase 4: Jury Evaluation & Live Competition Standings"]
-        O1 --> O4["Organizer: Issue Single-Use Cryptographic Judge Token"]
-        O4 --> J1["Judge: Redeem Token & Access Assigned Track Evaluation Queue"]
-        SYS1 --> J2["Jury Queue: Filter Only Candidates with Status ATTENDED"]
-        J1 --> J3["Judge: Grade on 100-Point Weighted Rubric (Innovation, Feasibility, Presentation)"]
-        J2 --> J3
-        J3 --> SYS2["Backend: Aggregate Juror Marks & Recalculate Standings"]
-        SYS2 --> S7["Student: View Real-Time Competition Leaderboard & Podium"]
+    subgraph P4 ["Phase 4: Day-of-Event & QR Attendance"]
+        direction TB
+        E_DAY["🏁 Event Kickoff"] --> AT1["👤 Student presents mobile Dynamic QR Pass"]
+        AT1 --> AT2["📅 Organizer scans pass with Check-in Kiosk"]
+        AT2 --> AT3["⚡ Attendance timestamped in SQLite & Firestore"]
+        AT3 --> AT4["📊 Organizer monitors real-time turn-out dashboard"]
     end
 
-    %% Phase 5
-    subgraph Phase5 ["Phase 5: Verifiable Fulfillment & AI Discovery"]
-        SYS2 --> O5["Organizer: Trigger Automated Certificate Minting"]
-        O5 --> SYS3["Backend: Verify ATTENDED Status & Compute Salted SHA-256 Digest"]
-        SYS3 --> SYS4["ReportLab: Compile Immutable PDF Certificate with Embedded QR Seal"]
-        SYS4 --> S8["Student: Access Verifiable Certificate in Portfolio"]
-        S8 --> S9["Student: Discover Next Events via AI/ML Recommendation Engine"]
-        SYS4 -.-> PUB1["Public / Employers: Scan QR Code on Public Verification Portal"]
+    subgraph P5 ["Phase 5: Hackathon Jury Evaluation"]
+        direction TB
+        J1["🛡️ Admin/Organizer assigns Jurors to Event"] --> J2["⚖️ Judge opens Jury Evaluation Console"]
+        J2 --> J3["⚖️ Judge evaluates submissions on 100-pt rubric"]
+        J3 --> J4["⚖️ Judge submits and locks final scores"]
+        J4 --> L1["🏆 Automated Leaderboard & Podium Aggregation"]
     end
 
-    classDef admin fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#fff;
-    classDef org fill:#1e3a8a,stroke:#60a5fa,stroke-width:2px,color:#fff;
-    classDef student fill:#065f46,stroke:#34d399,stroke-width:2px,color:#fff;
-    classDef judge fill:#581c87,stroke:#c084fc,stroke-width:2px,color:#fff;
-    classDef system fill:#7c2d12,stroke:#fb923c,stroke-width:2px,color:#fff;
+    subgraph P6 ["Phase 6: Cryptographic Minting & Verification"]
+        direction TB
+        C1["📅 Organizer triggers batch Certificate Generation"] --> C2["🔐 Backend computes SHA-256 Digest & QR Seal"]
+        C2 --> C3["📄 Tamper-proof PDF issued to Student Vault"]
+        C3 --> V1["👤 Student downloads PDF or shares Public Verify URL"]
+        V1 --> V2["🌐 External Recruiters verify validity on Public Portal"]
+    end
 
-    class A1,A2 admin;
-    class O1,O2,O3,O4,O5 org;
-    class S1,S2,S3,S4,S5,S6,S7,S8,S9 student;
-    class J1,J2,J3 judge;
-    class SYS1,SYS2,SYS3,SYS4,PUB1 system;
+    P1 --> P2 --> P3 --> P4 --> P5 --> P6
+
+    classDef p1 fill:#eff6ff,stroke:#3b82f6,stroke-width:2px,color:#1e3a8a;
+    classDef p2 fill:#fdf4ff,stroke:#a855f7,stroke-width:2px,color:#581c87;
+    classDef p3 fill:#ecfdf5,stroke:#10b981,stroke-width:2px,color:#064e3b;
+    classDef p4 fill:#fffbeb,stroke:#f59e0b,stroke-width:2px,color:#78350f;
+    classDef p5 fill:#fef2f2,stroke:#ef4444,stroke-width:2px,color:#7f1d1d;
+    classDef p6 fill:#f0fdf4,stroke:#16a34a,stroke-width:2px,color:#14532d;
+
+    class A1,A2,A3 p1;
+    class O1,O2,A4,O3 p2;
+    class S1,S2,S3,S4,S5 p3;
+    class E_DAY,AT1,AT2,AT3,AT4 p4;
+    class J1,J2,J3,J4,L1 p5;
+    class C1,C2,C3,V1,V2 p6;
 ```
 
 ---
 
+## 👥 Role-Based Operational Workflows
 
-EventSphere provides tailored, permission-isolated workflows across four primary platform stakeholders:
-
-### 3.1 Student / Participant Workflow
-The student journey guides learners from inter-collegiate event discovery through team assembly, on-site check-in, live competition tracking, and verified credential acquisition.
+### 4.1 Student / Participant Workflow
 
 ```mermaid
-flowchart TD
-    Start(["Student Enters Platform"]) --> Auth["Sign In / Google Student SSO"]
-    Auth --> Discovery["Explore Inter-University Event Catalog"]
-    Discovery --> Filter["Filter by Domain: Technical, Hackathon, Cultural, Sports"]
-    Filter --> EventDetails["Inspect Event Agenda, Rules & Capacity Limits"]
-    EventDetails --> Registration{"Individual or Team Event?"}
-    
-    Registration -->|"Individual"| DirectReg["Register for Event -> Registration: REGISTERED"]
-    Registration -->|"Team / Hackathon"| TeamDecision{"Create Squad or Join Existing?"}
-    
-    TeamDecision -->|"Create Squad"| CreateTeam["Create Squad -> Generate Unique 6-Char Invite Code"]
-    CreateTeam --> ShareCode["Share Invite Code with Cross-Campus Teammates"]
-    TeamDecision -->|"Join Squad"| InputCode["Enter Team Invite Code -> Validate Capacity"]
-    InputCode --> JoinedTeam["Added to Squad Roster -> Event Bound"]
-    ShareCode --> JoinedTeam
-    
-    DirectReg --> VenueArrival["Attend Physical Venue on Event Day"]
-    JoinedTeam --> VenueArrival
-    
-    VenueArrival --> ScanQR["Open Mobile QR Scanner -> Scan Venue Check-in QR"]
-    ScanQR --> AttendanceAPI["POST /api/attendance/check-in -> Validated"]
-    AttendanceAPI --> StatusUpdate["Status Updated: ATTENDED"]
-    
-    StatusUpdate --> Competition["Participate in Hackathon / Competition"]
-    Competition --> LiveBoard["View Real-Time Standings on Competition Leaderboard"]
-    Competition --> SubmitFeedback["Submit Post-Event Feedback & Rating"]
-    
-    LiveBoard --> CertEligibility{"Marked ATTENDED & Event Concluded?"}
-    CertEligibility -->|"Yes"| CertClaim["Receive Cryptographically Signed PDF Certificate"]
-    CertClaim --> VerifyQR["Scan Certificate QR Code -> Public Verification Link"]
-    CertEligibility -->|"No"| End(["End"])
-    VerifyQR --> AIRecommendations["View AI-Recommended Next Events Tailored to Profile"]
-    AIRecommendations --> End
+flowchart LR
+    S_IN["Sign In / Google SSO"] --> CAT["Event Catalog & Filters"]
+    CAT --> AI["AI Recommender<br/>Matchmaking"]
+    AI --> REG{"Registration<br/>Type"}
+    REG -- "Solo" --> CONF["Instant Confirmation"]
+    REG -- "Team Lead" --> SQUAD["Create Squad<br/>Get 6-char Code"]
+    REG -- "Member" --> JOIN["Enter Squad Code<br/>Join Team"]
+    SQUAD --> CONF
+    JOIN --> CONF
+    CONF --> QR["Dynamic QR Ticket<br/>Pass Issued"]
+    QR --> CHECK["On-site Kiosk Scan<br/>Attendance Verified"]
+    CHECK --> EVAL["Hackathon Hack &<br/>Jury Presentation"]
+    EVAL --> PODIUM["Live Podium &<br/>Leaderboard View"]
+    PODIUM --> FEED["Submit Feedback &<br/>Ratings"]
+    FEED --> CERT["Download SHA-256<br/>Signed PDF Certificate"]
 ```
 
----
-
-### 3.2 Event Organizer Workflow
-The organizer workflow equips faculty coordinators and student heads to structure agendas, monitor live enrollments, execute on-site check-ins, and mint immutable certificates.
+### 4.2 Event Organizer Workflow
 
 ```mermaid
-flowchart TD
-    Start(["Organizer Authenticates"]) --> OrgDash["Access Organizer Hub"]
-    OrgDash --> CreateProposal["Author New Event Proposal (Metadata, Hall, Dates, Capacity)"]
-    CreateProposal --> SubmitDraft["Submit Proposal -> Status: DRAFT"]
-    SubmitDraft --> AdminReview{"Superadmin Review"}
-    
-    AdminReview -->|"Rejected"| Revise["Revise Proposal or Terminate"]
-    Revise --> CreateProposal
-    AdminReview -->|"Approved"| Approved["Status: APPROVED (Published to Student Catalog)"]
-    
-    Approved --> SchedulePlanning["Agenda & Timeline Planning"]
-    SchedulePlanning --> AddSlots["Add Event Schedule Slots (Title, Agenda, Timeslot, Room)"]
-    AddSlots --> PublishSchedule["Publish Live Event Schedule Timeline"]
-    
-    PublishSchedule --> MonitorRegs["Monitor Real-Time Registrations & Squad Formations"]
-    MonitorRegs --> EventDay["Event Day Venue Operations"]
-    
-    EventDay --> ProjectQR["Generate Dynamic Attendance QR Code (Project on Venue Screen)"]
-    ProjectQR --> IngestCheckins["Students Scan QR -> Live Attendance Stream Ingested"]
-    IngestCheckins --> AuditRoster["Audit Verified Attendee Roll-List"]
-    
-    AuditRoster --> ConcludeEvent["Event Completion & Jury Grading Completed"]
-    ConcludeEvent --> MintCerts["Trigger Certificate Minting Console"]
-    MintCerts --> ValidateEligibility["System Filters Only RegistrationStatus.ATTENDED"]
-    ValidateEligibility --> GenPDF["ReportLab Engine Generates Cryptographic PDF Certificates"]
-    GenPDF --> EmbedHashes["Embed SHA-256 Digest & Verification QR Code"]
-    EmbedHashes --> Distribute["Certificates Delivered to Student Portfolios"]
+flowchart LR
+    O_IN["Organizer Login"] --> PROP["Draft Event Proposal<br/>Venue, Rules & Schedule"]
+    PROP --> SUB["Submit to Admin Queue"]
+    SUB --> REV{"Admin Review"}
+    REV -- "Needs Revisions" --> PROP
+    REV -- "Approved" --> LIVE["Event Goes Live"]
+    LIVE --> DASH["Manage Teams &<br/>Roster Real-Time"]
+    DASH --> AT_SCAN["Kiosk QR Scanner<br/>Check-in Mode"]
+    AT_SCAN --> J_ASSIGN["Assign Jurors &<br/>Monitor Scoring"]
+    J_ASSIGN --> RANK["Publish Final Rankings"]
+    RANK --> MINT["Batch Mint SHA-256<br/>PDF Certificates"]
+    MINT --> STATS["View Post-Event<br/>Analytics & Attendance"]
 ```
 
----
-
-### 3.3 Platform Administrator / Superadmin Workflow
-The superadmin console serves as the institutional root of trust, governing partner college registrations, reviewing incoming proposals, observing system telemetry, and auditing issued credentials.
+### 4.3 Platform Administrator / Superadmin Workflow
 
 ```mermaid
-flowchart TD
-    Start(["Superadmin Login (Credentials / MFA)"]) --> AdminConsole["Access Global Admin Console"]
-    AdminConsole --> SelectWorkspace["Select Institutional Workspace (Global / Specific University)"]
-    
-    SelectWorkspace --> UnivGov["University Governance & Partner Onboarding"]
-    UnivGov --> RegUniv["Register New Partner University (Campus, Domain, Nodal Officers)"]
-    RegUniv --> UnivRoster["Active Partner Universities Network Updated"]
-    
-    SelectWorkspace --> QueueInspection["Inspect Event Approvals & Governance Queue"]
-    QueueInspection --> ReviewProposal["Review Event Proposals (Venue Safety, Dates, Rules)"]
-    ReviewProposal --> GovernanceDecision{"Governance Action"}
-    GovernanceDecision -->|"Sanction"| Approve["Approve Proposal -> Status: APPROVED (Live Sync)"]
-    GovernanceDecision -->|"Reject"| Reject["Reject Proposal with Feedback"]
-    
-    SelectWorkspace --> DirectCreation["Direct Admin Event Override (Instantiate Official Hackathons)"]
-    DirectCreation --> Approve
-    
-    SelectWorkspace --> Telemetry["Platform Monitoring & Telemetry Dashboard"]
-    Telemetry --> SystemHealth["Audit Active User Sessions, API Latency & Database Metrics"]
-    
-    SelectWorkspace --> AttendeeRegistry["Centralized Cross-University Attendee Directory"]
-    AttendeeRegistry --> RosterAudit["Inspect Student Enrollments, College Distribution & Rosters"]
-    AttendeeRegistry --> OnSpot["Manual Walk-in Registration & Physical Gate Enrolment"]
-    
-    SelectWorkspace --> CredentialAudit["Public Credential Authority & Certificate Registry"]
-    CredentialAudit --> AuditCertificates["Verify Cryptographic Hashes, Issuance Logs & Anti-Fraud Logs"]
+flowchart LR
+    A_IN["Superadmin Login<br/>(/admin)"] --> FED["Manage Universities<br/>& Assign Coordinators"]
+    FED --> QUEUE["Review Pending<br/>Event Proposals"]
+    QUEUE --> DEC{"Approval Decision"}
+    DEC -- "Approve" --> PUB["Publish Event Catalog"]
+    DEC -- "Reject / Revise" --> FEEDBACK["Send Feedback to Organizer"]
+    PUB --> HEALTH["System Telemetry Console<br/>FastAPI Latency, SQLite, Cloud Firestore"]
+    HEALTH --> USER_GOV["User & Role Governance<br/>(Student / Organizer / Judge)"]
+    USER_GOV --> AUDIT["Inspect Audit Logs<br/>& System Activity"]
 ```
 
----
-
-### 3.4 Judge & Jury Evaluation Workflow
-The jury portal enables invited industry leaders and academic evaluators to grade competitor projects against standardized, normalized rubrics with role-based security guarding.
+### 4.4 Judge & Jury Evaluation Workflow
 
 ```mermaid
-flowchart TD
-    Start(["Domain Expert / Judge Receives Invitation"]) --> InviteToken["Redeem Cryptographically Secure Activation Token"]
-    InviteToken --> RoleActivated["Judge Account Activated & Bound to Event Track"]
-    
-    RoleActivated --> JuryPortal["Access Jury Evaluation Portal"]
-    JuryPortal --> AssignedTracks["Review Assigned Competitions & Hackathon Tracks"]
-    
-    AssignedTracks --> InspectCompetitors["Inspect Registered Competitors & Team Project Submissions"]
-    InspectCompetitors --> AttendanceGuard{"Competitor Marked ATTENDED?"}
-    AttendanceGuard -->|"No"| Exclude["Candidate Excluded from Evaluation Queue"]
-    AttendanceGuard -->|"Yes"| EvalQueue["Candidate Available in Live Evaluation Queue"]
-    
-    EvalQueue --> SelectCandidate["Select Team / Candidate for Evaluation"]
-    SelectCandidate --> RubricSystem["Load Normalized 100-Point Weighted Rubric"]
-    
-    RubricSystem --> Score1["Score Innovation & Novelty (Weight: 40%)"]
-    RubricSystem --> Score2["Score Technical Feasibility & Execution (Weight: 30%)"]
-    RubricSystem --> Score3["Score Presentation & Q&A Defense (Weight: 30%)"]
-    
-    Score1 & Score2 & Score3 --> InputFeedback["Provide Constructive Qualitative Juror Feedback"]
-    InputFeedback --> SubmitScore["Submit Evaluation -> POST /api/judges/scores"]
-    
-    SubmitScore --> AuthCheck{"Judge Authorization Verification"}
-    AuthCheck -->|"Unauthorized"| RejectHTTP["HTTP 403 Forbidden: Judge Not Assigned to Event"]
-    AuthCheck -->|"Authorized"| PersistScore["Score Committed to SQLite & Replicated to Firestore"]
-    
-    PersistScore --> AggregateLeaderboard["Backend Recalculates Cumulative Track Standings"]
-    AggregateLeaderboard --> LivePodium["Publish Live Podium Results (1st, 2nd, 3rd Place)"]
+flowchart LR
+    J_IN["Judge Sign In<br/>Credentials"] --> J_PORTAL["Jury Dashboard<br/>(/judge)"]
+    J_PORTAL --> EV_SEL["Select Assigned Event"]
+    EV_SEL --> ROSTER["Browse Participating<br/>Teams & Submissions"]
+    ROSTER --> EVAL["Score 100-Point Rubric<br/>- Innovation: 40%<br/>- Feasibility: 30%<br/>- Presentation: 30%"]
+    EVAL --> NOTES["Provide Qualitative<br/>Feedback & Notes"]
+    NOTES --> LOCK["Submit & Lock Evaluation"]
+    LOCK --> AGG["Leaderboard Recalculation<br/>Live Podium Update"]
 ```
 
 ---
 
 ## 🔐 Cryptographic Credential Authority
 
-EventSphere includes an automated zero-trust credential issuance and verification pipeline that protects against student certificate forgery:
+EventSphere implements a verifiable credential subsystem. Issued certificates are protected by salted SHA-256 digital digests:
 
-1. **High-Entropy Identifier**: Each certificate receives a unique uppercase UUID token: `OCC-2026-XXXXXXXX`.
-2. **Salted SHA-256 Digest Formulation**:
-   $$\text{Digest} = \text{SHA-256}(\text{cert\_id} \parallel \text{participant\_id} \parallel \text{event\_id} \parallel \text{OCCASIO\_SALT\_2026})$$
-3. **Embedded Vector QR Code**: A machine-readable QR code is generated containing the canonical verification endpoint:
-   `https://eventsphere-...vercel.app/api/certificates/verify/{certificate_id}`
-4. **ReportLab PDF Generation**: Injects institutional seals, candidate name, event track, rank, and the QR matrix onto an unalterable PDF vector canvas.
-5. **Zero-Trust Public Verification**: Recruiters, employers, and academic institutions visit the public verification portal to validate certificate authenticity in under 50 milliseconds without requiring login credentials.
+```text
+Digest = SHA-256(cert_id || participant_id || event_id || OCCASIO_SALT_2026)
+```
+
+* **Tamper Evident**: Any modification to student metadata or event metrics invalidates the embedded verification hash.
+* **Vector QR Embedding**: Printable vector QR codes allow offline validation linking directly to the public verification portal.
+* **Public Zero-Trust Verification**: Recruiters and employers can verify certificate legitimacy without requiring internal administrative access.
 
 ---
 
 ## 📦 Modular Backend & API Taxonomy
 
-The backend is structured into **9 modular domain routers** exposing 70+ validated endpoints:
+EventSphere exposes 14 modular FastAPI routers delivering enterprise-grade RESTful operations:
 
-| Domain | Route Prefix | Primary Responsibilities | Key Security Guard |
-|---|---|---|---|
-| **Authentication** | `/api/auth` | Login, registration, token refresh, Google SSO | `bcrypt`, `EmailStr`, JWT HS256 |
-| **University Governance** | `/api/universities` | Partner onboarding, campus domain mapping | `require_superadmin` |
-| **Event Management** | `/api/events` | Proposals, approvals, category filtering, capacity quotas | `require_organizer_or_admin` |
-| **Squads & Teams** | `/api/teams` | 6-char join codes, roster management, squad binding | `get_current_user` |
-| **Agenda & Schedules** | `/api/schedules` | Multi-track slot scheduling, hall reservations | `require_organizer_or_admin` |
-| **QR Attendance** | `/api/attendance` | Dynamic QR generation, mobile check-in verification | One-scan-per-user constraint |
-| **Jury Evaluations** | `/api/judges` | Weighted rubric scoring (100 pts), juror token invites | `require_judge_or_admin` |
-| **Leaderboards** | `/api/leaderboards` | Real-time score aggregation, podium standings | Public read / Filtered by event |
-| **Verifiable Credentials** | `/api/certificates` | ReportLab PDF compilation, SHA-256 verification | Attendance-enforced minting |
-| **AI Recommendations** | `/api/recommendations` | Skill-tailored event recommendation heuristics | `get_current_user` |
+| Router Module | Mount Prefix | Core Operations & Responsibilities |
+|---|---|---|
+| `auth.py` | `/api/auth` | User registration, JWT token generation, role verification, Google SSO |
+| `universities.py` | `/api/universities` | Institutional federation, campus tenant segregation, coordinator mapping |
+| `events.py` | `/api/events` | Event CRUD, proposals, multi-tier approvals, category filtering |
+| `schedules.py` | `/api/schedules` | Session timeline, speaker tracks, multi-day scheduling |
+| `teams.py` | `/api/teams` | Cross-college hackathon squad formation, dynamic 6-character invite codes |
+| `registrations.py`| `/api/registrations` | Ticket reservations, squad registration, capacity throttling |
+| `attendance.py` | `/api/attendance` | High-throughput dynamic QR check-in, presence verification |
+| `judges.py` | `/api/judges` | Juror assignments, 100-point rubric scoring matrix, feedback recording |
+| `leaderboards.py`| `/api/leaderboards` | Real-time score aggregation, podium calculation, tie-breaking |
+| `certificates.py`| `/api/certificates` | ReportLab PDF certificate minting, SHA-256 digest sealing, public verification |
+| `recommendations.py`| `/api/recommendations` | AI/ML heuristic collaborative filtering and interest matchmaking |
+| `feedbacks.py` | `/api/feedbacks` | Post-event participant surveys, ratings, analytics collection |
+| `participants.py`| `/api/participants` | Student profiles, attendance histories, credential wallets |
+| `monitoring.py` | `/api/monitoring` | Real-time system health checks (FastAPI latency, SQLite WAL, Firestore sync) |
 
 ---
 
 ## 🗄️ Database Schema & Data Models
 
-The relational schema is defined using **SQLAlchemy 2.0 Declarative Models**:
+EventSphere utilizes a relational schema of 13 normalized tables in SQLite (WAL Mode), mirrored asynchronously to Google Cloud Firestore:
 
-```
-[Universities]
- └── id (PK), name, location, domain, created_at
-
-[Users]
- ├── id (PK), email (Unique), hashed_password, full_name
- └── role [ADMIN, ORGANIZER, PARTICIPANT, JUDGE], is_superadmin
-
-[Events]
- ├── id (PK), title, description, category [TECHNICAL, CULTURAL, SPORTS, HACKATHON]
- ├── status [DRAFT, APPROVED, REJECTED, COMPLETED], university_id (FK), organizer_id (FK)
- └── start_date, end_date, venue, max_capacity
-
-[Schedules]
- └── id (PK), event_id (FK), title, agenda, start_time, end_time, hall_name
-
-[Teams]
- ├── id (PK), event_id (FK), leader_id (FK), name, join_code (Unique, 6-Char)
- └── max_members, status [FORMING, LOCKED]
-
-[Registrations]
- ├── id (PK), event_id (FK), user_id (FK), team_id (FK, Nullable)
- └── status [REGISTERED, ATTENDED, CANCELLED], registered_at
-
-[Attendance]
- └── id (PK), event_id (FK), user_id (FK), check_in_time, check_in_method [QR_SCAN]
-
-[Evaluations / Scores]
- ├── id (PK), event_id (FK), judge_id (FK), participant_id (FK), team_id (FK)
- └── score_innovation, score_feasibility, score_presentation, total_score, remarks
-
-[Certificates]
- ├── id (PK, OCC-XXXX), event_id (FK), participant_id (FK), verification_hash
- └── certificate_type, pdf_file_path, issued_at
-```
+| Model Entity | Table Identifier | Primary Relationships & Keys |
+|---|---|---|
+| `University` | `universities` | `id`, `name`, `code`, `domain`, `location` |
+| `User` | `users` | `id`, `email`, `hashed_password`, `role`, `university_id` (FK) |
+| `Event` | `events` | `id`, `title`, `status`, `capacity`, `organizer_id` (FK), `university_id` (FK) |
+| `Schedule` | `schedules` | `id`, `event_id` (FK), `title`, `start_time`, `end_time`, `venue` |
+| `Team` | `teams` | `id`, `name`, `event_id` (FK), `leader_id` (FK), `invite_code` (Unique 6-char) |
+| `TeamMember` | `team_members` | `id`, `team_id` (FK), `user_id` (FK), `role` |
+| `Registration` | `registrations` | `id`, `event_id` (FK), `user_id` (FK), `team_id` (FK), `ticket_code` |
+| `Attendance` | `attendances` | `id`, `event_id` (FK), `user_id` (FK), `checked_in_at`, `verified_by` |
+| `JudgeAssignment`| `judge_assignments`| `id`, `event_id` (FK), `user_id` (FK) |
+| `Evaluation` | `evaluations` | `id`, `judge_id` (FK), `team_id` (FK), `innovation_score`, `feasibility_score`, `presentation_score`, `total_score` |
+| `Certificate` | `certificates` | `id`, `event_id` (FK), `user_id` (FK), `sha256_hash`, `issued_at`, `pdf_path` |
+| `Feedback` | `feedbacks` | `id`, `event_id` (FK), `user_id` (FK), `rating`, `comments` |
+| `AuditLog` | `audit_logs` | `id`, `user_id` (FK), `action`, `entity`, `entity_id`, `created_at` |
 
 ---
 
-## 💻 Local Development & Quick Start
+## ⚡ Local Development & Quick Start
 
 EventSphere includes a **Single-Host Unified Server** that serves both the compiled React 19 frontend and the FastAPI REST backend from a single port (`http://localhost:8000`):
 
-### 1. Prerequisites
-* Python 3.11 or Python 3.12
-* Node.js 18+ and npm
-
-### 2. Setup & Installation
-```bash
-# Clone the repository
+```powershell
+# 1. Clone repository
 git clone https://github.com/Yojasree1905/eventsphere.git
 cd eventsphere
 
-# Install Python backend dependencies
-cd backend
-pip install -r requirements.txt
-cd ..
-
-# Install frontend dependencies and build production SPA bundle
-cd frontend
-npm install
-npm run build
-cd ..
-```
-
-### 3. Launch Unified Server
-```bash
-# Run unified platform (serves SPA and API together)
+# 2. Run the unified launcher (Powershell / Windows)
 python run.py
 
-# (On Windows, you can simply double-click start.bat)
+# Or double-click start.bat in the root folder!
 ```
 
-### 4. Direct Access Points
-* **Web Application**: [http://localhost:8000](http://localhost:8000)
-* **Teams & Hackathons Page**: [http://localhost:8000/teams](http://localhost:8000/teams)
-* **Interactive API Documentation (Swagger)**: [http://localhost:8000/docs](http://localhost:8000/docs)
-* **Alternative API Documentation (ReDoc)**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
+Once running:
+* **Unified Web Application**: `http://localhost:8000`
+* **Swagger API Documentation**: `http://localhost:8000/docs`
+* **Health Check & Telemetry**: `http://localhost:8000/api/health`
 
-### 5. Default Credentials
-* **Superadmin Email**: `admin@occasio.com`
-* **Superadmin Password**: `Admin@1234`
-* **Google Sign-In**: Click **"Sign in with Google"** on the login screen to test student credentials (`vankireddis2023@vitstudent.ac.in`).
+### Seed Account Credentials
+
+| Role | Email | Password |
+|---|---|---|
+| **Super Admin** | `admin@occasio.com` | `Admin@1234` |
+| **Event Organizer** | `organizer@occasio.com` | `Organizer@1234` |
+| **Student** | `student@occasio.com` | `Student@1234` |
+| **Judge** | `judge@occasio.com` | `Judge@1234` |
 
 ---
 
 ## 🧪 Automated Testing & Quality Assurance
 
-EventSphere maintains 100% test pass rates across critical authentication, event governance, schedule conflict, and team lifecycle workflows:
+EventSphere maintains an automated test suite verifying all 9 core platform modules:
 
-```bash
-# Execute test suite via Pytest
-python -m pytest backend/tests/ -v
+```powershell
+cd backend
+pytest tests/ -v
 ```
 
-```
+```text
 ============================= test session starts =============================
-platform win32 -- Python 3.14.0, pytest-9.2.0, pluggy-1.7.0
+platform win32 -- Python 3.12.0, pytest-8.3.3
+rootdir: C:\Users\yoju1\OneDrive\Desktop\Occasio_iip\Occasio_iip\backend
 collected 29 items
 
-backend/tests/test_auth.py::test_create_user_and_login_success PASSED   [  3%]
-backend/tests/test_auth.py::test_login_invalid_credentials PASSED       [  6%]
-backend/tests/test_auth.py::test_token_expiration_behavior PASSED       [ 10%]
-backend/tests/test_auth.py::test_get_current_user_profile PASSED        [ 13%]
-backend/tests/test_auth.py::test_superadmin_seed_present PASSED         [ 17%]
+tests/test_auth.py::test_register_user PASSED                            [  3%]
+tests/test_auth.py::test_login_user PASSED                               [  6%]
+tests/test_auth.py::test_invalid_login PASSED                             [ 10%]
+tests/test_events.py::test_create_event_proposal PASSED                  [ 13%]
+tests/test_events.py::test_admin_approve_event PASSED                     [ 17%]
+tests/test_eventsphere_core.py::test_01_university_federation PASSED     [ 20%]
+tests/test_eventsphere_core.py::test_02_rbac_access_control PASSED       [ 24%]
+tests/test_eventsphere_core.py::test_03_team_invite_codes PASSED         [ 27%]
+tests/test_eventsphere_core.py::test_04_team_member_joining PASSED       [ 31%]
+tests/test_eventsphere_core.py::test_05_dynamic_qr_checkin PASSED        [ 34%]
+tests/test_eventsphere_core.py::test_06_prevent_duplicate_checkin PASSED [ 37%]
+tests/test_eventsphere_core.py::test_07_jury_rubric_scoring PASSED       [ 41%]
+tests/test_eventsphere_core.py::test_08_leaderboard_podium_ranks PASSED  [ 44%]
+tests/test_eventsphere_core.py::test_09_certificate_minting_sha256 PASSED [ 48%]
+tests/test_eventsphere_core.py::test_10_public_certificate_verify PASSED [ 51%]
+tests/test_eventsphere_core.py::test_11_ai_heuristic_recommendations PASSED [ 55%]
+tests/test_eventsphere_core.py::test_12_telemetry_system_health PASSED   [ 58%]
+tests/test_eventsphere_core.py::test_13_audit_log_tracking PASSED        [ 62%]
 ...
-backend/tests/test_events.py::test_event_proposal_flow PASSED          [ 55%]
-backend/tests/test_events.py::test_event_capacity_enforcement PASSED   [ 58%]
-backend/tests/test_schedules.py::test_schedule_creation PASSED         [ 89%]
-backend/tests/test_eventsphere_core.py::test_teams_join_code PASSED    [ 96%]
-backend/tests/test_eventsphere_core.py::test_cert_verification PASSED  [100%]
-
-======================= 29 passed in 7.15s =======================
+============================= 29 passed in 4.12s =============================
 ```
 
 ---
 
-## ☁️ Production Deployment (Vercel Edge & Serverless)
+## 🚢 Production Deployment (Vercel Edge & Serverless)
 
-The platform is configured for zero-configuration, continuous deployment on **Vercel** via [`vercel.json`](vercel.json):
-
-```json
-{
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "services": {
-    "frontend": {
-      "root": "frontend/",
-      "framework": "vite"
-    },
-    "backend": {
-      "root": "backend/",
-      "entrypoint": "main:app"
-    }
-  },
-  "rewrites": [
-    { "source": "/api", "destination": { "service": "backend" } },
-    { "source": "/api/(.*)", "destination": { "service": "backend" } },
-    { "source": "/(.*)", "destination": { "service": "frontend" } }
-  ]
-}
-```
-
-* **Vercel Build Command**: Automatically compiles the React SPA via `npm run build` and provisions a serverless Python 3.12 container.
-* **Serverless SQLite Handling**: Automatically detects read-only execution environments (Vercel/AWS Lambda) and migrates the seed database into writable `/tmp/occasio.db`.
-* **SPA Client-Side Routing**: Direct deep-links (`/teams`, `/login`, `/dashboard`) seamlessly fall back to `/index.html` via edge rewrites.
-
----
-
-## 👥 Contributors & Acknowledgements
-
-* **Yojasree Vankireddi** (`vankireddi.s2023@vitstudent.ac.in`) — Lead Architecture & Full-Stack Development
-* **Platform Title**: EventSphere (Occasio) Multi-University Ecosystem
-* **Institution**: Vellore Institute of Technology (VIT)
-* **License**: MIT Open Source License
-
----
-
-<div align="center">
-  <sub>Built with ❤️ for collegiate students, organizers, and academic institutions worldwide.</sub>
-</div>
+The repository is configured for zero-configuration continuous deployment to Vercel:
+* **Frontend**: Built via Vite and hosted on Vercel Global Anycast CDN.
+* **Backend**: Serverless FastAPI ASGI container on AWS Lambda / Vercel Edge Runtime (Python 3.12).
+* **Database Fallback**: Serverless environment automatically unpacks pre-seeded `occasio.db` to writable `/tmp` storage while preserving read-through capabilities.
+* **Live Deployment**: [https://eventsphere-vankireddis2023-vitstudentas-projects.vercel.app](https://eventsphere-vankireddis2023-vitstudentas-projects.vercel.app)
