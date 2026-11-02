@@ -116,6 +116,72 @@ flowchart TD
 
 ## 🔄 Role-Based Operational Workflows
 
+### 🌟 Unified Master Lifecycle Flow Diagram (All 4 Roles)
+This end-to-end master flowchart illustrates how all four stakeholders—**Superadmin, Organizer, Student, and Judge**—interact collaboratively across the 5 distinct phases of an event's lifecycle:
+
+```mermaid
+flowchart TD
+    %% Phase 1
+    subgraph Phase1 ["Phase 1: Institutional Foundation & Event Conception"]
+        A1["Platform Admin: Onboard Partner Universities"] --> O1["Organizer: Author Event Proposal"]
+        O1 --> A2["Platform Admin: Review & Sanction Proposal (Status: APPROVED)"]
+    end
+
+    %% Phase 2
+    subgraph Phase2 ["Phase 2: Agenda Scheduling & Cross-Campus Team Assembly"]
+        A2 --> O2["Organizer: Structure Multi-Day Agenda & Time Slots"]
+        A2 --> S1["Student: Discover Sanctioned Event in Public Catalog"]
+        S1 --> S2{"Individual or Team Event?"}
+        S2 -->|"Individual"| S3["Student: Register for Event (Status: REGISTERED)"]
+        S2 -->|"Team / Hackathon"| S4["Student Leader: Create Squad & Generate 6-Char Invite Code"]
+        S4 --> S5["Cross-Campus Teammates: Join Squad via Invite Code"]
+    end
+
+    %% Phase 3
+    subgraph Phase3 ["Phase 3: Event Day Venue Operations & Live Check-In"]
+        O2 --> O3["Organizer: Display Dynamic Time-Stamped Venue QR Code"]
+        S3 & S5 --> S6["Student: Scan Venue QR via Mobile Camera"]
+        O3 -.-> S6
+        S6 --> SYS1["Backend: Ingest Attendance & Update Status to ATTENDED"]
+    end
+
+    %% Phase 4
+    subgraph Phase4 ["Phase 4: Jury Evaluation & Live Competition Standings"]
+        O1 --> O4["Organizer: Issue Single-Use Cryptographic Judge Token"]
+        O4 --> J1["Judge: Redeem Token & Access Assigned Track Evaluation Queue"]
+        SYS1 --> J2["Jury Queue: Filter Only Candidates with Status ATTENDED"]
+        J1 --> J3["Judge: Grade on 100-Point Weighted Rubric (Innovation, Feasibility, Presentation)"]
+        J2 --> J3
+        J3 --> SYS2["Backend: Aggregate Juror Marks & Recalculate Standings"]
+        SYS2 --> S7["Student: View Real-Time Competition Leaderboard & Podium"]
+    end
+
+    %% Phase 5
+    subgraph Phase5 ["Phase 5: Verifiable Fulfillment & AI Discovery"]
+        SYS2 --> O5["Organizer: Trigger Automated Certificate Minting"]
+        O5 --> SYS3["Backend: Verify ATTENDED Status & Compute Salted SHA-256 Digest"]
+        SYS3 --> SYS4["ReportLab: Compile Immutable PDF Certificate with Embedded QR Seal"]
+        SYS4 --> S8["Student: Access Verifiable Certificate in Portfolio"]
+        S8 --> S9["Student: Discover Next Events via AI/ML Recommendation Engine"]
+        SYS4 -.-> PUB1["Public / Employers: Scan QR Code on Public Verification Portal"]
+    end
+
+    classDef admin fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#fff;
+    classDef org fill:#1e3a8a,stroke:#60a5fa,stroke-width:2px,color:#fff;
+    classDef student fill:#065f46,stroke:#34d399,stroke-width:2px,color:#fff;
+    classDef judge fill:#581c87,stroke:#c084fc,stroke-width:2px,color:#fff;
+    classDef system fill:#7c2d12,stroke:#fb923c,stroke-width:2px,color:#fff;
+
+    class A1,A2 admin;
+    class O1,O2,O3,O4,O5 org;
+    class S1,S2,S3,S4,S5,S6,S7,S8,S9 student;
+    class J1,J2,J3 judge;
+    class SYS1,SYS2,SYS3,SYS4,PUB1 system;
+```
+
+---
+
+
 EventSphere provides tailored, permission-isolated workflows across four primary platform stakeholders:
 
 ### 3.1 Student / Participant Workflow
